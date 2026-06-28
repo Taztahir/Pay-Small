@@ -3,7 +3,7 @@
 import * as React from "react"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
-import { LayoutDashboardIcon, LayersIcon, SettingsIcon, LogOutIcon, PiggyBankIcon } from "lucide-react"
+import { LayoutDashboardIcon, LayersIcon, SettingsIcon, LogOutIcon, PiggyBankIcon, BellIcon } from "lucide-react"
 import {
   Sidebar,
   SidebarContent,
@@ -27,6 +27,7 @@ const user = {
 const mainNav = [
   { title: "Dashboard", href: "/dashboard", icon: LayoutDashboardIcon },
   { title: "Campaigns",  href: "/dashboard/campaigns", icon: LayersIcon },
+  { title: "Notifications", href: "/dashboard/notifications", icon: BellIcon },
   { title: "Settings",  href: "/dashboard/settings",  icon: SettingsIcon },
 ]
 

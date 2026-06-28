@@ -22,6 +22,10 @@ import {
 } from "@/components/ui/sidebar"
 import { EllipsisVerticalIcon, CircleUserRoundIcon, CreditCardIcon, BellIcon, LogOutIcon } from "lucide-react"
 
+import Link from "next/link"
+import * as React from "react"
+import { signOut } from "@/app/actions/auth"
+
 export function NavUser({
   user,
 }: {
@@ -32,6 +36,14 @@ export function NavUser({
   }
 }) {
   const { isMobile } = useSidebar()
+  const [isPending, startTransition] = React.useTransition()
+
+  const handleLogout = () => {
+    startTransition(async () => {
+      await signOut()
+    })
+  }
+
   return (
     <SidebarMenu>
       <SidebarMenuItem>
@@ -77,27 +89,27 @@ export function NavUser({
             </DropdownMenuGroup>
             <DropdownMenuSeparator />
             <DropdownMenuGroup>
-              <DropdownMenuItem>
-                <CircleUserRoundIcon
-                />
-                Account
+              <DropdownMenuItem asChild>
+                <Link href="/dashboard/settings" className="flex w-full items-center cursor-pointer">
+                  <CircleUserRoundIcon className="mr-2 size-4" />
+                  Account
+                </Link>
               </DropdownMenuItem>
-              <DropdownMenuItem>
-                <CreditCardIcon
-                />
-                Billing
-              </DropdownMenuItem>
-              <DropdownMenuItem>
-                <BellIcon
-                />
-                Notifications
+              <DropdownMenuItem asChild>
+                <Link href="/dashboard/notifications" className="flex w-full items-center cursor-pointer">
+                  <BellIcon className="mr-2 size-4" />
+                  Notifications
+                </Link>
               </DropdownMenuItem>
             </DropdownMenuGroup>
             <DropdownMenuSeparator />
-            <DropdownMenuItem>
-              <LogOutIcon
-              />
-              Log out
+            <DropdownMenuItem
+              onClick={handleLogout}
+              disabled={isPending}
+              className="text-destructive focus:text-destructive cursor-pointer"
+            >
+              <LogOutIcon className="mr-2 size-4" />
+              {isPending ? "Logging out..." : "Log out"}
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
