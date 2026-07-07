@@ -50,63 +50,63 @@
 }
 
 /* ─── PaySmall brand tokens ─────────────────────────────────────────────── */
-/* Primary green  #1D9E75 → oklch(0.618 0.142 164)
-   Dark bg        #0A0A0A → oklch(0.09  0     0)
-   Card bg        #111111 → oklch(0.13  0     0)
-   Border         #1F1F1F → oklch(0.18  0     0)
-   Muted text     #888888 → oklch(0.58  0     0)
-   Amber warning  #F59E0B → oklch(0.75  0.152 72)
+/* Primary green   #174A38
+   Background      #F8FBF7
+   Card bg         #FFFFFF
+   Border          #D9E6DC
+   Muted text      #4B5563
+   Warning         #F59E0B
    ------------------------------------------------------------------- */
 
 :root {
-  color-scheme: dark;
+  color-scheme: light;
   /* backgrounds */
-  --background:            oklch(0.09  0     0);   /* #0A0A0A */
-  --card:                  oklch(0.13  0     0);   /* #111111 */
-  --popover:               oklch(0.13  0     0);
+  --background:            #F8FBF7;
+  --card:                  #FFFFFF;
+  --popover:               #FFFFFF;
   /* text */
-  --foreground:            oklch(0.96  0     0);
-  --card-foreground:       oklch(0.96  0     0);
-  --popover-foreground:    oklch(0.96  0     0);
+  --foreground:            #10201A;
+  --card-foreground:       #10201A;
+  --popover-foreground:    #10201A;
   /* primary — PaySmall green */
-  --primary:               oklch(0.618 0.142 164); /* #1D9E75 */
-  --primary-foreground:    oklch(0.99  0     0);
+  --primary:               #174A38;
+  --primary-foreground:    #FFFFFF;
   /* secondary */
-  --secondary:             oklch(0.18  0     0);
-  --secondary-foreground:  oklch(0.88  0     0);
+  --secondary:             #D1F2E6;
+  --secondary-foreground:  #10201A;
   /* muted */
-  --muted:                 oklch(0.18  0     0);
-  --muted-foreground:      oklch(0.58  0     0);   /* #888888 */
+  --muted:                 #D9E6DC;
+  --muted-foreground:      #4B5563;
   /* accent */
-  --accent:                oklch(0.21  0.025 164);
-  --accent-foreground:     oklch(0.96  0     0);
+  --accent:                #0F6A4B;
+  --accent-foreground:     #FFFFFF;
   /* destructive / warning */
-  --destructive:           oklch(0.65  0.22  27);
-  --warning:               oklch(0.75  0.152 72);  /* #F59E0B amber */
+  --destructive:           #EF4444;
+  --warning:               #F59E0B;
   /* borders & ring */
-  --border:                oklch(0.18  0     0);   /* #1F1F1F */
-  --input:                 oklch(0.21  0     0);
-  --ring:                  oklch(0.618 0.142 164);
+  --border:                #D9E6DC;
+  --input:                 #FFFFFF;
+  --ring:                  #174A38;
   /* charts — green gradient family */
-  --chart-1:               oklch(0.618 0.142 164);
-  --chart-2:               oklch(0.52  0.12  164);
-  --chart-3:               oklch(0.42  0.09  164);
-  --chart-4:               oklch(0.75  0.152 72);  /* amber accent */
-  --chart-5:               oklch(0.32  0.06  164);
+  --chart-1:               #174A38;
+  --chart-2:               #2D6A52;
+  --chart-3:               #3F7C64;
+  --chart-4:               #F59E0B;
+  --chart-5:               #0E4F3C;
   --radius: 0.625rem;
   /* sidebar */
-  --sidebar:               oklch(0.11  0     0);
-  --sidebar-foreground:    oklch(0.88  0     0);
-  --sidebar-primary:       oklch(0.618 0.142 164);
-  --sidebar-primary-foreground: oklch(0.99 0   0);
-  --sidebar-accent:        oklch(0.18  0.015 164);
-  --sidebar-accent-foreground: oklch(0.96  0   0);
-  --sidebar-border:        oklch(0.18  0     0);
-  --sidebar-ring:          oklch(0.618 0.142 164);
+  --sidebar:               #FFFFFF;
+  --sidebar-foreground:    #10201A;
+  --sidebar-primary:       #174A38;
+  --sidebar-primary-foreground: #FFFFFF;
+  --sidebar-accent:        #E7F7EE;
+  --sidebar-accent-foreground: #10201A;
+  --sidebar-border:        #D9E6DC;
+  --sidebar-ring:          #174A38;
 }
 
-/* Force dark mode always — PaySmall is dark-only */
-/* color-scheme: dark is already set on :root above */
+/* Force light mode always — PaySmall is light-only */
+/* color-scheme: light is already set on :root above */
 
 @layer base {
   * {
