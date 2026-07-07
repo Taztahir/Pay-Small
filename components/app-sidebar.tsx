@@ -2,8 +2,10 @@
 
 import * as React from "react"
 import Link from "next/link"
-import { usePathname } from "next/navigation"
+import { usePathname, useRouter } from "next/navigation"
 import { LayoutDashboardIcon, LayersIcon, SettingsIcon, LogOutIcon, PiggyBankIcon, BellIcon } from "lucide-react"
+import { authApi } from "@/lib/auth"
+import { useUser } from "@/components/user-context"
 import {
   Sidebar,
   SidebarContent,
@@ -18,12 +20,6 @@ import {
 } from "@/components/ui/sidebar"
 import { NavUser } from "@/components/nav-user"
 
-const user = {
-  name: "Amara Okafor",
-  email: "amara@paysmall.ng",
-  avatar: "",
-}
-
 const mainNav = [
   { title: "Dashboard", href: "/dashboard", icon: LayoutDashboardIcon },
   { title: "Campaigns",  href: "/dashboard/campaigns", icon: LayersIcon },
@@ -33,6 +29,27 @@ const mainNav = [
 
 export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
   const pathname = usePathname()
+  const router = useRouter()
+  const [isPending, startTransition] = React.useTransition()
+  const { user } = useUser()
+  const sidebarUser = {
+    name: user?.name || "Your account",
+    email: user?.email || "",
+    avatar: "",
+  }
+
+  const handleLogout = () => {
+    startTransition(async () => {
+      try {
+        await authApi.logout()
+      } catch (error) {
+        console.error("Logout failed:", error)
+      } finally {
+        router.push("/sign-in")
+        router.refresh()
+      }
+    })
+  }
 
   return (
     <Sidebar collapsible="offcanvas" {...props}>
@@ -85,13 +102,18 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
         <SidebarSeparator />
         <SidebarMenu>
           <SidebarMenuItem>
-            <SidebarMenuButton tooltip="Log out" render={<button type="button" />}>
+            <SidebarMenuButton
+              tooltip="Log out"
+              render={<button type="button" />}
+              onClick={handleLogout}
+              disabled={isPending}
+            >
               <LogOutIcon className="size-4" />
-              <span>Log out</span>
+              <span>{isPending ? "Logging out..." : "Log out"}</span>
             </SidebarMenuButton>
           </SidebarMenuItem>
         </SidebarMenu>
-        <NavUser user={user} />
+        <NavUser user={sidebarUser} />
       </SidebarFooter>
     </Sidebar>
   )

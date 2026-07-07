@@ -1,11 +1,13 @@
 "use client"
 
 import { useState } from "react"
+import { useRouter } from "next/navigation"
 import Link from "next/link"
 import { ArrowRight, Eye, EyeOff, Loader2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
+import { authApi } from "@/lib/auth"
 
 type AuthMode = "sign-in" | "sign-up"
 
@@ -31,14 +33,50 @@ const copy = {
 export function AuthForm({ mode }: { mode: AuthMode }) {
   const [showPassword, setShowPassword] = useState(false)
   const [loading, setLoading] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const router = useRouter()
   const t = copy[mode]
   const isSignUp = mode === "sign-up"
 
-  function handleSubmit(e: React.FormEvent) {
+  async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault()
+    setError(null)
     setLoading(true)
-    // Frontend demo only — wire up to real auth when ready.
-    setTimeout(() => setLoading(false), 1200)
+
+    const formData = new FormData(e.currentTarget)
+    const email = formData.get("email") as string
+    const password = formData.get("password") as string
+
+    try {
+      let result: { token?: string | null } | null = null
+
+      if (isSignUp) {
+        const name = formData.get("name") as string
+        result = await authApi.register({
+          name,
+          email,
+          password,
+        })
+      } else {
+        result = await authApi.login({
+          email,
+          password,
+        })
+      }
+
+      if (!result?.token) {
+        throw new Error("Authentication succeeded but no session token was returned.")
+      }
+
+      router.push("/dashboard")
+      router.refresh()
+    } catch (err: unknown) {
+      const message =
+        err instanceof Error ? err.message : "Something went wrong. Please try again."
+      setError(message)
+    } finally {
+      setLoading(false)
+    }
   }
 
   return (
@@ -50,7 +88,7 @@ export function AuthForm({ mode }: { mode: AuthMode }) {
         {t.subtitle}
       </p>
 
-      <form onSubmit={handleSubmit} className="mt-8 flex flex-col gap-4">
+      <form onSubmit={handleSubmit} className="mt-8 flex flex-col gap-4" noValidate>
         {isSignUp && (
           <div className="flex flex-col gap-2">
             <Label htmlFor="name">Full name</Label>
@@ -61,6 +99,7 @@ export function AuthForm({ mode }: { mode: AuthMode }) {
               autoComplete="name"
               placeholder="Adaeze Okafor"
               required
+              minLength={2}
             />
           </div>
         )}
@@ -114,6 +153,12 @@ export function AuthForm({ mode }: { mode: AuthMode }) {
             </button>
           </div>
         </div>
+
+        {error && (
+          <p role="alert" className="rounded-lg bg-destructive/10 px-3 py-2 text-sm text-destructive">
+            {error}
+          </p>
+        )}
 
         <Button
           type="submit"

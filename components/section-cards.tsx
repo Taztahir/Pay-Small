@@ -15,42 +15,49 @@ function formatNaira(amount: number): string {
   return `₦${amount.toLocaleString("en-NG")}`
 }
 
-const stats = [
-  {
-    label: "Total Campaigns",
-    value: "24",
-    icon: LayersIcon,
-    badge: "+3 this month",
-    trend: "up",
-    note: "Across all campaign types",
-  },
-  {
-    label: "Total Collected",
-    value: formatNaira(680000),
-    icon: TrendingUpIcon,
-    badge: "+18.4%",
-    trend: "up",
-    note: "Since last month",
-  },
-  {
-    label: "Total Members",
-    value: "312",
-    icon: UsersIcon,
-    badge: "+12.5%",
-    trend: "up",
-    note: "Across active campaigns",
-  },
-  {
-    label: "Pending Payments",
-    value: "47",
-    icon: ClockIcon,
-    badge: "Needs attention",
-    trend: "warn",
-    note: "SMS reminders sent",
-  },
-]
+import type { Campaign } from "@/lib/types"
 
-export function SectionCards() {
+export function SectionCards({ campaigns }: { campaigns: Campaign[] }) {
+  const totalCampaigns = campaigns.length
+  const totalCollected = campaigns.reduce((sum, c) => sum + Number(c.currentBalance || 0), 0)
+  const activeCampaigns = campaigns.filter(c => c.status === "active").length
+  const totalTarget = campaigns.reduce((sum, c) => sum + Number(c.targetAmount || 0), 0)
+
+  const stats = [
+    {
+      label: "Total Campaigns",
+      value: String(totalCampaigns),
+      icon: LayersIcon,
+      badge: `${activeCampaigns} active`,
+      trend: "up",
+      note: "Across all campaign statuses",
+    },
+    {
+      label: "Total Collected",
+      value: formatNaira(totalCollected),
+      icon: TrendingUpIcon,
+      badge: totalTarget > 0 ? `${Math.round((totalCollected / totalTarget) * 100)}% of target` : "0% of target",
+      trend: "up",
+      note: "Contributions received",
+    },
+    {
+      label: "Active Campaigns",
+      value: String(activeCampaigns),
+      icon: UsersIcon,
+      badge: "In progress",
+      trend: "up",
+      note: "Accepting payments",
+    },
+    {
+      label: "Total Target",
+      value: formatNaira(totalTarget),
+      icon: ClockIcon,
+      badge: "Target goal",
+      trend: "up",
+      note: "Sum of target goals",
+    },
+  ]
+
   return (
     <div className="grid grid-cols-1 gap-4 px-4 lg:px-6 @xl/main:grid-cols-2 @5xl/main:grid-cols-4">
       {stats.map(({ label, value, icon: Icon, badge, trend, note }) => (

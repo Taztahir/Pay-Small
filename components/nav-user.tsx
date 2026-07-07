@@ -24,7 +24,8 @@ import { EllipsisVerticalIcon, CircleUserRoundIcon, CreditCardIcon, BellIcon, Lo
 
 import Link from "next/link"
 import * as React from "react"
-import { signOut } from "@/app/actions/auth"
+import { authApi } from "@/lib/auth"
+import { useRouter } from "next/navigation"
 
 export function NavUser({
   user,
@@ -36,11 +37,27 @@ export function NavUser({
   }
 }) {
   const { isMobile } = useSidebar()
+  const router = useRouter()
   const [isPending, startTransition] = React.useTransition()
+  const initials = React.useMemo(() => {
+    return user.name
+      .split(/\s+/)
+      .filter(Boolean)
+      .slice(0, 2)
+      .map((part) => part[0]?.toUpperCase() ?? "")
+      .join("") || "U"
+  }, [user.name])
 
   const handleLogout = () => {
     startTransition(async () => {
-      await signOut()
+      try {
+        await authApi.logout()
+      } catch (err) {
+        console.error("Logout failed:", err)
+      } finally {
+        router.push("/sign-in")
+        router.refresh()
+      }
     })
   }
 
@@ -55,7 +72,7 @@ export function NavUser({
           >
             <Avatar className="size-8 rounded-lg grayscale">
               <AvatarImage src={user.avatar} alt={user.name} />
-              <AvatarFallback className="rounded-lg">CN</AvatarFallback>
+              <AvatarFallback className="rounded-lg">{initials}</AvatarFallback>
             </Avatar>
             <div className="grid flex-1 text-left text-sm leading-tight">
               <span className="truncate font-medium">{user.name}</span>
@@ -76,7 +93,7 @@ export function NavUser({
                 <div className="flex items-center gap-2 px-1 py-1.5 text-left text-sm">
                   <Avatar className="size-8">
                     <AvatarImage src={user.avatar} alt={user.name} />
-                    <AvatarFallback className="rounded-lg">CN</AvatarFallback>
+                    <AvatarFallback className="rounded-lg">{initials}</AvatarFallback>
                   </Avatar>
                   <div className="grid flex-1 text-left text-sm leading-tight">
                     <span className="truncate font-medium">{user.name}</span>

@@ -12,6 +12,9 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { cn } from "@/lib/utils"
+import { usersApi } from "@/lib/admin"
+import { useUser } from "@/components/user-context"
+import { useRouter } from "next/navigation"
 
 // ── Reusable sub-components ────────────────────────────────────────────────────
 
@@ -69,10 +72,16 @@ function Switch({ id, checked, onChange, label }: {
 
 // ── Main component ─────────────────────────────────────────────────────────────
 export function SettingsClient() {
+  const router = useRouter()
+
   // Profile
-  const [name,  setName]  = React.useState("Amara Okafor")
+  const { user, setUser } = useUser()
+  const [name,  setName]  = React.useState("")
+  const [email, setEmail] = React.useState("")
   const [phone, setPhone] = React.useState("")
   const [savingProfile, setSavingProfile] = React.useState(false)
+  const [profileError, setProfileError] = React.useState<string | null>(null)
+  const [profileSuccess, setProfileSuccess] = React.useState<string | null>(null)
 
   // Notifications
   const [smsEnabled,       setSmsEnabled]       = React.useState(true)
@@ -83,11 +92,30 @@ export function SettingsClient() {
   const [deleteOpen,   setDeleteOpen]   = React.useState(false)
   const [deletingAcct, setDeletingAcct] = React.useState(false)
 
+  React.useEffect(() => {
+    if (user) {
+      setName(user.name ?? "")
+      setEmail(user.email ?? "")
+    }
+  }, [user])
+
   async function saveProfile() {
     setSavingProfile(true)
-    await new Promise(r => setTimeout(r, 1000))
-    setSavingProfile(false)
-    toast.success("Profile updated")
+    setProfileError(null)
+    setProfileSuccess(null)
+
+    try {
+      const updated = await usersApi.update({ name })
+      setUser((current) => current ? { ...current, ...updated.data } : updated.data)
+      setProfileSuccess("Profile updated successfully.")
+      toast.success("Profile updated")
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : "Unable to save your profile right now."
+      setProfileError(message)
+      toast.error("Profile update failed", { description: message })
+    } finally {
+      setSavingProfile(false)
+    }
   }
 
   async function saveNotif() {
@@ -99,16 +127,28 @@ export function SettingsClient() {
 
   async function deleteAccount() {
     setDeletingAcct(true)
-    await new Promise(r => setTimeout(r, 1500))
-    setDeletingAcct(false)
-    setDeleteOpen(false)
-    toast.error("Account deletion requested", { description: "You will receive a confirmation email." })
+
+    try {
+      const response = await usersApi.remove()
+      if (typeof window !== "undefined") {
+        localStorage.removeItem("paysmall_token")
+      }
+      setDeleteOpen(false)
+      toast.success(response?.message || "Account deleted successfully")
+      router.replace("/login")
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : "Unable to delete your account right now."
+      setDeleteOpen(false)
+      toast.error("Account deletion failed", { description: message })
+    } finally {
+      setDeletingAcct(false)
+    }
   }
 
   return (
     <>
       {/* Sticky header */}
-      <header className="sticky top-0 z-30 flex h-[var(--header-height)] shrink-0 items-center gap-2 border-b border-border bg-background/90 px-4 backdrop-blur lg:px-6">
+      <header className="sticky top-0 z-30 flex h-(--header-height) shrink-0 items-center gap-2 border-b border-border bg-background/90 px-4 backdrop-blur lg:px-6">
         <SidebarTrigger className="-ml-1" />
         <Separator orientation="vertical" className="mx-2 h-4" />
         <div>
@@ -125,13 +165,19 @@ export function SettingsClient() {
             <Input id="profile-name" value={name} onChange={e => setName(e.target.value)} className="bg-background" />
           </Field>
           <Field label="Email" htmlFor="profile-email" hint="Contact support to change your email">
-            <Input id="profile-email" type="email" value="amara@paysmall.ng" readOnly
+            <Input id="profile-email" type="email" value={email} readOnly
               className="bg-background cursor-not-allowed opacity-60" aria-describedby="email-hint" />
           </Field>
           <Field label="Phone Number" htmlFor="profile-phone">
             <Input id="profile-phone" type="tel" placeholder="0801 234 5678" value={phone}
               onChange={e => setPhone(e.target.value)} className="bg-background" />
           </Field>
+          {profileError && (
+            <p className="text-sm text-destructive">{profileError}</p>
+          )}
+          {profileSuccess && (
+            <p className="text-sm text-primary">{profileSuccess}</p>
+          )}
           <div className="flex justify-end pt-1">
             <Button onClick={saveProfile} disabled={savingProfile}
               className="gap-2 bg-primary text-primary-foreground hover:bg-primary/90">
@@ -201,9 +247,9 @@ export function SettingsClient() {
             <div className="flex h-12 w-12 items-center justify-center rounded-full bg-destructive/10 mb-2">
               <Trash2Icon className="size-6 text-destructive" />
             </div>
-            <DialogTitle className="text-base font-semibold text-foreground">Are you absolutely sure?</DialogTitle>
+            <DialogTitle className="text-base font-semibold text-foreground">Are you sure?</DialogTitle>
             <p className="text-sm text-muted-foreground">
-              This will permanently delete your account, all campaigns, and all member data. This action cannot be reversed.
+              This will permanently delete your account and all associated data. This cannot be undone.
             </p>
           </DialogHeader>
           <div className="flex flex-col gap-2 pt-2">
