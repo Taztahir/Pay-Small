@@ -13,6 +13,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { cn } from "@/lib/utils"
 import { usersApi } from "@/lib/admin"
+import { profileApi, transfersApi } from "@/lib/transfers-and-profile"
+import type { Bank, OrganizerProfile } from "@/lib/types"
 import { useUser } from "@/components/user-context"
 import { useRouter } from "next/navigation"
 
@@ -82,6 +84,16 @@ export function SettingsClient() {
   const [savingProfile, setSavingProfile] = React.useState(false)
   const [profileError, setProfileError] = React.useState<string | null>(null)
   const [profileSuccess, setProfileSuccess] = React.useState<string | null>(null)
+  const [payoutProfile, setPayoutProfile] = React.useState<OrganizerProfile | null>(null)
+  const [banks, setBanks] = React.useState<Bank[]>([])
+  const [selectedBankCode, setSelectedBankCode] = React.useState("")
+  const [accountNumber, setAccountNumber] = React.useState("")
+  const [phoneNumber, setPhoneNumber] = React.useState("")
+  const [accountName, setAccountName] = React.useState<string | null>(null)
+  const [bankLoading, setBankLoading] = React.useState(true)
+  const [bankError, setBankError] = React.useState<string | null>(null)
+  const [bankSuccess, setBankSuccess] = React.useState<string | null>(null)
+  const [verifyingBank, setVerifyingBank] = React.useState(false)
 
   // Notifications
   const [smsEnabled,       setSmsEnabled]       = React.useState(true)
@@ -98,6 +110,57 @@ export function SettingsClient() {
       setEmail(user.email ?? "")
     }
   }, [user])
+
+  React.useEffect(() => {
+    let active = true
+
+    async function loadPayoutSettings() {
+      setBankLoading(true)
+      setBankError(null)
+
+      const banksPromise = transfersApi.listBanks()
+      const profilePromise = profileApi.get()
+
+      const [banksResult, profileResult] = await Promise.allSettled([
+        banksPromise,
+        profilePromise,
+      ])
+
+      if (!active) {
+        setBankLoading(false)
+        return
+      }
+
+      if (banksResult.status === "fulfilled") {
+        setBanks(banksResult.value.data ?? [])
+      } else {
+        console.error("loadPayoutSettings banks error:", banksResult.reason)
+        setBanks([])
+        const message = banksResult.reason instanceof Error ? banksResult.reason.message : "Unable to load bank list."
+        setBankError(message)
+      }
+
+      if (profileResult.status === "fulfilled") {
+        setPayoutProfile(profileResult.value.data)
+        setSelectedBankCode(profileResult.value.data.bankCode ?? "")
+        setAccountNumber(profileResult.value.data.accountNumber ?? "")
+        setPhoneNumber(profileResult.value.data.phoneNumber ?? "")
+        setAccountName(profileResult.value.data.accountName ?? null)
+      } else {
+        console.error("loadPayoutSettings profile error:", profileResult.reason)
+        const message = profileResult.reason instanceof Error ? profileResult.reason.message : "Unable to load payout profile."
+        setBankError(message)
+      }
+
+      setBankLoading(false)
+    }
+
+    void loadPayoutSettings()
+
+    return () => {
+      active = false
+    }
+  }, [])
 
   async function saveProfile() {
     setSavingProfile(true)
@@ -200,7 +263,10 @@ export function SettingsClient() {
           </div>
 
           <Field label="Reminder timing" htmlFor="reminder-timing">
-            <Select value={reminderTiming} onValueChange={setReminderTiming}>
+            <Select
+              value={reminderTiming}
+              onValueChange={(value) => setReminderTiming(value ?? "")}
+            >
               <SelectTrigger id="reminder-timing" className="w-full bg-background"><SelectValue /></SelectTrigger>
               <SelectContent>
                 <SelectItem value="1-day">1 day before deadline</SelectItem>
@@ -217,6 +283,123 @@ export function SettingsClient() {
               Save Preferences
             </Button>
           </div>
+        </SectionCard>
+
+        <SectionCard
+          title="Payout account"
+          description="Configure your bank account for campaign withdrawals."
+        >
+          {bankLoading ? (
+            <div className="text-sm text-muted-foreground">Loading payout settings…</div>
+          ) : (
+            <>
+              {payoutProfile?.verifiedAt ? (
+                <div className="rounded-lg border border-green-200 bg-green-50 p-3 text-sm text-foreground">
+                  <p className="font-medium text-foreground">Payout account verified</p>
+                  <p className="text-sm text-muted-foreground">
+                    Funds will be withdrawn to your saved account once you request a payout.
+                  </p>
+                </div>
+              ) : (
+                <div className="rounded-lg border border-yellow-200 bg-yellow-50 p-3 text-sm text-foreground">
+                  <p className="font-medium text-foreground">No verified payout account</p>
+                  <p className="text-sm text-muted-foreground">
+                    Enter a bank account and verify it so withdrawals can be completed.
+                  </p>
+                </div>
+              )}
+
+              <div className="grid gap-4 md:grid-cols-3">
+                <div className="space-y-2">
+                  <Label htmlFor="bankCode">Bank</Label>
+                  <Select
+                    value={selectedBankCode}
+                    onValueChange={(value) => setSelectedBankCode(value ?? "")}
+                    disabled={bankLoading}
+                  >
+                    <SelectTrigger id="bankCode" className="w-full bg-background" aria-label="Bank">
+                      <SelectValue placeholder={bankLoading ? "Loading banks…" : "Select a bank"}>
+                        {(value) => {
+                          if (!value) return null
+                          return banks.find((bank) => bank.code === value)?.name ?? value
+                        }}
+                      </SelectValue>
+                    </SelectTrigger>
+                    <SelectContent>
+                      {banks.length === 0 ? (
+                        <SelectItem value="" disabled>
+                          No banks available
+                        </SelectItem>
+                      ) : (
+                        banks.map((bank) => (
+                          <SelectItem key={bank.code} value={bank.code}>
+                            {bank.name}
+                          </SelectItem>
+                        ))
+                      )}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2 md:col-span-1">
+                  <Label htmlFor="accountNumber">Account number</Label>
+                  <Input
+                    id="accountNumber"
+                    type="text"
+                    value={accountNumber}
+                    onChange={(e) => setAccountNumber(e.target.value)}
+                    placeholder="1234567890"
+                  />
+                </div>
+                <div className="space-y-2 md:col-span-1">
+                  <Label htmlFor="phoneNumber">Phone number</Label>
+                  <Input
+                    id="phoneNumber"
+                    type="tel"
+                    value={phoneNumber}
+                    onChange={(e) => setPhoneNumber(e.target.value)}
+                    placeholder="0801 234 5678"
+                  />
+                </div>
+              </div>
+
+              {accountName && (
+                <p className="text-sm text-muted-foreground">Account name: <span className="font-medium text-foreground">{accountName}</span></p>
+              )}
+
+              {bankError && <p className="text-sm text-destructive">{bankError}</p>}
+              {bankSuccess && <p className="text-sm text-primary">{bankSuccess}</p>}
+
+              <div className="flex justify-end pt-1">
+                <Button onClick={async () => {
+                  setVerifyingBank(true)
+                  setBankError(null)
+                  setBankSuccess(null)
+
+                  try {
+                    const verified = await profileApi.verifyBank({
+                      bankCode: selectedBankCode,
+                      accountNumber,
+                      phoneNumber,
+                    })
+                    setPayoutProfile(verified.data)
+                    setAccountName(verified.data.accountName)
+                    setBankSuccess("Payout account verified successfully.")
+                    toast.success("Payout account updated")
+                  } catch (err: unknown) {
+                    const message = err instanceof Error ? err.message : "Unable to verify payout account."
+                    setBankError(message)
+                    toast.error("Verification failed", { description: message })
+                  } finally {
+                    setVerifyingBank(false)
+                  }
+                }} disabled={verifyingBank || bankLoading || !selectedBankCode || !accountNumber || !phoneNumber}
+                  className="gap-2 bg-primary text-primary-foreground hover:bg-primary/90">
+                  {verifyingBank && <Loader2Icon className="size-3.5 animate-spin" />}
+                  Save payout account
+                </Button>
+              </div>
+            </>
+          )}
         </SectionCard>
 
         {/* ── Section 3: Danger Zone ────────────────────────────────────────── */}

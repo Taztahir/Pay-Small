@@ -31,7 +31,7 @@ export default function AdminSmsLogsPage() {
       </div>
 
       <div className="flex">
-        <Select value={filter} onValueChange={setFilter}>
+        <Select value={filter} onValueChange={(value) => setFilter(value ?? "") }>
           <SelectTrigger className="w-40 bg-card"><SelectValue /></SelectTrigger>
           <SelectContent>
             <SelectItem value="all">All Status</SelectItem>

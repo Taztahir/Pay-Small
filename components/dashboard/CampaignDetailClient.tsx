@@ -15,8 +15,26 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card"
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table"
 import { campaignsApi, membersApi } from "@/lib/campaigns"
-import type { Campaign, CampaignMember, CampaignStatus, DispatchMethod } from "@/lib/types"
+import { profileApi } from "@/lib/transfers-and-profile"
+import type {
+  Campaign,
+  CampaignMember,
+  CampaignStatus,
+  DispatchMethod,
+  OrganizerProfile,
+  PaginatedMeta,
+  Transaction,
+} from "@/lib/types"
 
 function formatNaira(amount: number): string {
   return `₦${amount.toLocaleString("en-NG")}`
@@ -43,9 +61,20 @@ export function CampaignDetailClient() {
   const [members, setMembers] = React.useState<CampaignMember[]>([])
   const [loading, setLoading] = React.useState(true)
   const [saving, setSaving] = React.useState(false)
+  const [activating, setActivating] = React.useState(false)
+  const [refreshing, setRefreshing] = React.useState(false)
   const [deleting, setDeleting] = React.useState(false)
   const [memberLoading, setMemberLoading] = React.useState(false)
   const [error, setError] = React.useState<string | null>(null)
+  const [payoutProfile, setPayoutProfile] = React.useState<OrganizerProfile | null>(null)
+  const [transactions, setTransactions] = React.useState<Transaction[]>([])
+  const [txMeta, setTxMeta] = React.useState<PaginatedMeta | null>(null)
+  const [txLoading, setTxLoading] = React.useState(false)
+  const [txError, setTxError] = React.useState<string | null>(null)
+  const [transactionPage, setTransactionPage] = React.useState(1)
+  const [activeTab, setActiveTab] = React.useState("overview")
+  const [withdrawing, setWithdrawing] = React.useState(false)
+  const refreshTimer = React.useRef<number | null>(null)
   const [editForm, setEditForm] = React.useState({
     title: "",
     targetAmount: "",
@@ -93,6 +122,42 @@ export function CampaignDetailClient() {
     void loadCampaign()
   }, [loadCampaign])
 
+  React.useEffect(() => {
+    let active = true
+
+    async function loadOrganizerProfile() {
+      if (!campaignId) return
+      try {
+        const profileResponse = await profileApi.get()
+        if (!active) return
+        setPayoutProfile(profileResponse.data)
+      } catch {
+        // ignore profile load failures, withdrawal requires settings
+      }
+    }
+
+    void loadOrganizerProfile()
+
+    return () => {
+      active = false
+    }
+  }, [campaignId])
+
+  React.useEffect(() => {
+    if (activeTab !== "transactions") return
+    if (!campaignId) return
+
+    void loadTransactions(transactionPage)
+  }, [activeTab, campaignId, transactionPage])
+
+  React.useEffect(() => {
+    return () => {
+      if (refreshTimer.current) {
+        window.clearTimeout(refreshTimer.current)
+      }
+    }
+  }, [])
+
   async function handleSave() {
     if (!campaignId) return
 
@@ -102,8 +167,11 @@ export function CampaignDetailClient() {
     try {
       const payload: Record<string, unknown> = {
         title: editForm.title,
-        status: editForm.status,
         dispatchMethod: editForm.dispatchMethod,
+      }
+
+      if (editForm.status !== "active") {
+        payload.status = editForm.status
       }
 
       if (editForm.targetAmount !== "") {
@@ -119,13 +187,80 @@ export function CampaignDetailClient() {
 
       const updated = await campaignsApi.update(campaignId, payload)
       setCampaign(updated.data)
-      toast.success("Campaign updated")
+
+      if (editForm.status === "active" && campaign?.status !== "active") {
+        const activation = await campaignsApi.activate(campaignId)
+        toast.success(activation.message || "Campaign activated")
+        await loadCampaign()
+        refreshTimer.current = window.setTimeout(() => {
+          void loadCampaign()
+        }, 3000)
+      } else {
+        toast.success("Campaign updated")
+      }
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : "Unable to save changes."
       setError(message)
       toast.error("Update failed", { description: message })
     } finally {
       setSaving(false)
+    }
+  }
+
+  async function handleActivate() {
+    if (!campaignId) return
+
+    setActivating(true)
+    setError(null)
+
+    try {
+      const activation = await campaignsApi.activate(campaignId)
+      toast.success(activation.message || "Campaign activated")
+      await loadCampaign()
+      refreshTimer.current = window.setTimeout(() => {
+        void loadCampaign()
+      }, 3000)
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : "Unable to activate campaign."
+      setError(message)
+      toast.error("Activation failed", { description: message })
+    } finally {
+      setActivating(false)
+    }
+  }
+
+  async function loadTransactions(page = 1) {
+    if (!campaignId) return
+
+    setTxLoading(true)
+    setTxError(null)
+
+    try {
+      const response = await campaignsApi.transactions(campaignId, { page, limit: 10 })
+      setTransactions(response.data ?? [])
+      setTxMeta(response.meta ?? null)
+      setTransactionPage(page)
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : "Unable to load transactions."
+      setTxError(message)
+    } finally {
+      setTxLoading(false)
+    }
+  }
+
+  async function handleRefresh() {
+    if (!campaignId) return
+
+    setRefreshing(true)
+    setError(null)
+
+    try {
+      await loadCampaign()
+      toast.success("Campaign refreshed")
+    } catch {
+      // loadCampaign already handles errors
+    } finally {
+      setRefreshing(false)
     }
   }
 
@@ -193,6 +328,28 @@ export function CampaignDetailClient() {
     }
   }
 
+  async function handleWithdraw() {
+    if (!campaignId || !window.confirm("Withdraw available balance to your verified payout account?")) return
+
+    setWithdrawing(true)
+    setError(null)
+
+    try {
+      const response = await campaignsApi.withdraw(campaignId)
+      toast.success(response.message || "Withdrawal requested")
+      await loadCampaign()
+      if (activeTab === "transactions") {
+        await loadTransactions(transactionPage)
+      }
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : "Unable to withdraw funds."
+      setError(message)
+      toast.error("Withdrawal failed", { description: message })
+    } finally {
+      setWithdrawing(false)
+    }
+  }
+
   if (loading) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-background">
@@ -257,6 +414,31 @@ export function CampaignDetailClient() {
                 <p className="text-xl font-semibold">{formatDate(campaign.deadline)}</p>
               </div>
             </CardContent>
+            {(campaign.status === "active" && Number(campaign.currentBalance) > 0) ? (
+              <CardContent className="border-t border-border pt-4">
+                {payoutProfile?.verifiedAt ? (
+                  <div className="flex flex-col gap-3">
+                    <div className="rounded-lg border border-green-200 bg-green-50 p-3 text-sm text-foreground">
+                      <p className="font-medium">Withdrawal ready</p>
+                      <p className="text-sm text-muted-foreground">
+                        Your payout account is verified. You may withdraw the available balance.
+                      </p>
+                    </div>
+                    <Button onClick={handleWithdraw} disabled={withdrawing} className="gap-2">
+                      {withdrawing ? <Loader2Icon className="h-4 w-4 animate-spin" /> : null}
+                      Withdraw funds
+                    </Button>
+                  </div>
+                ) : (
+                  <div className="rounded-lg border border-yellow-200 bg-yellow-50 p-3 text-sm text-foreground">
+                    <p className="font-medium">Payout account required</p>
+                    <p className="text-sm text-muted-foreground">
+                      Verify your payout account in Settings before withdrawing campaign funds.
+                    </p>
+                  </div>
+                )}
+              </CardContent>
+            ) : null}
           </Card>
 
           <Card>
@@ -325,6 +507,12 @@ export function CampaignDetailClient() {
                   {saving ? <Loader2Icon className="h-4 w-4 animate-spin" /> : null}
                   Save changes
                 </Button>
+                {campaign?.status === "draft" ? (
+                  <Button variant="secondary" onClick={handleActivate} disabled={activating} className="gap-2">
+                    {activating ? <Loader2Icon className="h-4 w-4 animate-spin" /> : null}
+                    Activate campaign
+                  </Button>
+                ) : null}
                 <Button variant="destructive" onClick={handleDelete} disabled={deleting} className="gap-2">
                   {deleting ? <Loader2Icon className="h-4 w-4 animate-spin" /> : <Trash2Icon className="h-4 w-4" />}
                   Delete campaign
@@ -336,9 +524,15 @@ export function CampaignDetailClient() {
 
         <div className="space-y-6">
           <Card>
-            <CardHeader>
-              <CardTitle>Contributors</CardTitle>
-              <CardDescription>Use the real member endpoints.</CardDescription>
+            <CardHeader className="flex flex-wrap items-start justify-between gap-3">
+              <div>
+                <CardTitle>Contributors</CardTitle>
+                <CardDescription>Use the real member endpoints.</CardDescription>
+              </div>
+              <Button variant="outline" size="sm" onClick={handleRefresh} disabled={refreshing} className="gap-2">
+                {refreshing ? <Loader2Icon className="h-4 w-4 animate-spin" /> : null}
+                Refresh
+              </Button>
             </CardHeader>
             <CardContent className="space-y-4">
               <form onSubmit={handleAddMember} className="space-y-3">
@@ -391,11 +585,21 @@ export function CampaignDetailClient() {
                   <p className="text-sm text-muted-foreground">No contributors yet.</p>
                 ) : (
                   members.map((member) => (
-                    <div key={member.id} className="flex items-center justify-between rounded-lg border border-border p-3">
+                    <div key={member.id} className="flex flex-col gap-3 rounded-lg border border-border p-3 sm:flex-row sm:items-center sm:justify-between">
                       <div>
                         <p className="font-medium">{member.guestName}</p>
                         <p className="text-sm text-muted-foreground">{member.guestEmail ?? member.phoneNumber ?? "No contact details"}</p>
                         <p className="text-sm text-muted-foreground">Expected: {formatNaira(Number(member.amountExpected ?? 0))}</p>
+                        <p className="text-sm text-muted-foreground">
+                          {member.accountNumber ? (
+                            <>
+                              <span className="font-medium">{member.bankName ?? "Bank"}</span>
+                              {` • ${member.accountNumber}`}
+                            </>
+                          ) : (
+                            "Account number pending"
+                          )}
+                        </p>
                       </div>
                       <Button variant="ghost" size="sm" onClick={() => handleRemoveMember(member.id)} className="gap-2">
                         <Trash2Icon className="h-4 w-4" />
@@ -405,6 +609,99 @@ export function CampaignDetailClient() {
                   ))
                 )}
               </div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader className="flex items-center justify-between gap-3">
+              <div>
+                <CardTitle>Transactions</CardTitle>
+                <CardDescription>Track payments received for this campaign.</CardDescription>
+              </div>
+            </CardHeader>
+            <CardContent>
+              <Tabs value={activeTab} onValueChange={setActiveTab}>
+                <TabsList className="mb-4">
+                  <TabsTrigger value="overview">Overview</TabsTrigger>
+                  <TabsTrigger value="transactions">Transactions</TabsTrigger>
+                </TabsList>
+                <TabsContent value="overview">
+                  <div className="space-y-3">
+                    <p className="text-sm text-muted-foreground">
+                      View the campaign's transaction history and track payout readiness.
+                    </p>
+                    <div className="grid gap-4 sm:grid-cols-2">
+                      <div className="rounded-lg border border-border bg-muted p-3">
+                        <p className="text-xs uppercase tracking-[0.2em] text-muted-foreground">Total transactions</p>
+                        <p className="mt-1 text-xl font-semibold">{txMeta?.total ?? 0}</p>
+                      </div>
+                      <div className="rounded-lg border border-border bg-muted p-3">
+                        <p className="text-xs uppercase tracking-[0.2em] text-muted-foreground">Latest transaction</p>
+                        <p className="mt-1 text-sm font-medium text-foreground">
+                          {transactions[0]?.reference ?? "No transactions yet"}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                </TabsContent>
+                <TabsContent value="transactions">
+                  {txLoading ? (
+                    <div className="flex items-center justify-center py-10">
+                      <Loader2Icon className="h-6 w-6 animate-spin text-primary" />
+                    </div>
+                  ) : txError ? (
+                    <p className="text-sm text-destructive">{txError}</p>
+                  ) : transactions.length === 0 ? (
+                    <p className="text-sm text-muted-foreground">No transactions found.</p>
+                  ) : (
+                    <div className="space-y-4">
+                      <Table>
+                        <TableHeader>
+                          <TableRow>
+                            <TableHead>Reference</TableHead>
+                            <TableHead>Amount</TableHead>
+                            <TableHead>Member</TableHead>
+                            <TableHead>Date</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {transactions.map((tx) => (
+                            <TableRow key={tx.id}>
+                              <TableCell>{tx.reference}</TableCell>
+                              <TableCell>{formatNaira(Number(tx.amount))}</TableCell>
+                              <TableCell>{tx.memberId ?? "Direct"}</TableCell>
+                              <TableCell>{formatDate(tx.createdAt)}</TableCell>
+                            </TableRow>
+                          ))}
+                        </TableBody>
+                      </Table>
+                      <div className="flex flex-wrap items-center justify-between gap-3">
+                        <p className="text-sm text-muted-foreground">
+                          Page {txMeta?.page ?? 1} of {txMeta?.totalPages ?? 1}
+                        </p>
+                        <div className="flex gap-2">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => loadTransactions(Math.max(1, (txMeta?.page ?? 1) - 1))}
+                            disabled={txLoading || (txMeta?.page ?? 1) <= 1}
+                          >
+                            Previous
+                          </Button>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => loadTransactions(Math.min(txMeta?.totalPages ?? 1, (txMeta?.page ?? 1) + 1))}
+                            disabled={txLoading || (txMeta?.page ?? 1) >= (txMeta?.totalPages ?? 1)}
+                          >
+                            Next
+                          </Button>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </TabsContent>
+              </Tabs>
             </CardContent>
           </Card>
         </div>

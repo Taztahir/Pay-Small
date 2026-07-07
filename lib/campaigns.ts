@@ -7,6 +7,7 @@ import type {
   UpdateCampaignInput,
   CampaignMember,
   AddMemberInput,
+  Transaction,
 } from "./types";
 
 export const campaignsApi = {
@@ -28,6 +29,11 @@ export const campaignsApi = {
       body: input,
     }),
 
+  activate: (id: string) =>
+    apiFetch<ApiEnvelope<unknown>>(`/campaigns/${id}/activate`, {
+      method: "POST",
+    }),
+
   remove: (id: string) =>
     apiFetch<ApiEnvelope<null>>(`/campaigns/${id}`, { method: "DELETE" }),
 
@@ -37,7 +43,7 @@ export const campaignsApi = {
     }),
 
   transactions: (id: string, params?: { page?: number; limit?: number }) =>
-    apiFetch<Paginated<unknown>>(`/campaigns/${id}/transactions`, {
+    apiFetch<Paginated<Transaction>>(`/campaigns/${id}/transactions`, {
       query: params,
     }),
 };

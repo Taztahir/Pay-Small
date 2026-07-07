@@ -225,7 +225,7 @@ export function CampaignsClient() {
             <Input id="campaigns-search" placeholder="Search campaigns…" value={search}
               onChange={e => setSearch(e.target.value)} className="bg-background pl-9" aria-label="Search campaigns" />
           </div>
-          <Select value={sort} onValueChange={setSort}>
+          <Select value={sort} onValueChange={(value) => setSort(value ?? "") }>
             <SelectTrigger className="w-full bg-background sm:w-48" aria-label="Sort campaigns"><SelectValue /></SelectTrigger>
             <SelectContent>
               <SelectItem value="newest">Newest first</SelectItem>

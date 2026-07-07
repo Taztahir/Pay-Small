@@ -78,6 +78,16 @@ export interface CampaignMember {
   createdAt: string;
 }
 
+export interface Transaction {
+  id: string;
+  campaignId: string;
+  memberId: string | null;
+  amount: string;
+  reference: string;
+  rawPayload: unknown;
+  createdAt: string;
+}
+
 export interface AddMemberInput {
   guestName: string; // min 2 chars
   guestEmail?: string | null;
