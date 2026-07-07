@@ -23,7 +23,8 @@ import { TOKEN_KEY } from "./api";
 // ── Auth base URL ──────────────────────────────────────────────────────────────
 // Better Auth lives under /auth, separate from the application API paths.
 function normalizeAuthBase(url: string): string {
-  const clean = url.replace(/\/+$|\/+/g, (match) => (match.length > 1 ? "/" : "/"))
+  // Only strip trailing slashes — never touch the "//" after the protocol.
+  const clean = url.replace(/\/+$/, "")
   if (clean.endsWith("/api/v1/auth")) return clean
   if (clean.endsWith("/api/v1")) return `${clean}/auth`
   return clean.replace(/\/api\/v1\/?$/, "/api/v1/auth")
@@ -34,6 +35,15 @@ const AUTH_BASE = process.env.NEXT_PUBLIC_AUTH_BASE_URL
   : process.env.NEXT_PUBLIC_API_BASE_URL
   ? normalizeAuthBase(process.env.NEXT_PUBLIC_API_BASE_URL)
   : "http://localhost:3001/api/v1/auth"
+
+// Temporary: log resolved auth base so we can verify runtime value in the browser console.
+// Remove this after verification.
+try {
+  // eslint-disable-next-line no-console
+  console.log("AUTH_BASE:", AUTH_BASE)
+} catch (e) {
+  // ignore
+}
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 
