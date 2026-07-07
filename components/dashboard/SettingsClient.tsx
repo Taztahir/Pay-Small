@@ -327,12 +327,12 @@ export function SettingsClient() {
                     </SelectTrigger>
                     <SelectContent>
                       {banks.length === 0 ? (
-                        <SelectItem value="" disabled>
+                        <SelectItem key="no-banks" value="" disabled>
                           No banks available
                         </SelectItem>
                       ) : (
-                        banks.map((bank) => (
-                          <SelectItem key={bank.code} value={bank.code}>
+                        banks.map((bank, index) => (
+                          <SelectItem key={`${bank.code}-${index}`} value={bank.code}>
                             {bank.name}
                           </SelectItem>
                         ))
