@@ -4,6 +4,7 @@ import { HowItWorks } from "@/components/how-it-works"
 import { Features } from "@/components/features"
 import { CTA } from "@/components/cta"
 import { SiteFooter } from "@/components/site-footer"
+// import Hero from "@/components/hero-section-7"
 
 export default function Page() {
   return (
